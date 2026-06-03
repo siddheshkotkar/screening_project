@@ -49,11 +49,11 @@ class ComparisonService:
             return cls.parse_content(MOCK_GITLAB_CONTENT)
             
         try:
-            # Fetch with a 5 second timeout
+            # Fetch with a 5 second timeout, ignoring SSL verification for self-signed certificates
             headers = {}
             if token.strip():
                 headers["PRIVATE-TOKEN"] = token.strip()
-            response = httpx.get(url, headers=headers, timeout=5.0)
+            response = httpx.get(url, headers=headers, timeout=5.0, verify=False)
             response.raise_for_status()
             return cls.parse_content(response.text)
         except Exception as e:
