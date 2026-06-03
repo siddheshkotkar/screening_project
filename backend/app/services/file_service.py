@@ -50,13 +50,16 @@ class FileService:
     def load_feeds(file_path: str) -> List[FeedSchema]:
         """
         Reads the local file and parses it into a list of FeedSchema objects.
+        If the local file does not exist, fetches the baseline from GitLab.
         """
         if not os.path.exists(file_path):
-            # Create directories and file if not exists
-            os.makedirs(os.path.dirname(file_path), exist_ok=True)
-            with open(file_path, "w", encoding="utf-8") as f:
-                f.write(DEFAULT_HEADER + "\n")
-            return []
+            from app.config import settings
+            from app.services.comparison_service import ComparisonService
+            try:
+                # Fetch remote baseline file directly from GitLab on the fly
+                return ComparisonService.fetch_remote_file(settings.gitlab_file_url, settings.gitlab_token)
+            except Exception as e:
+                raise RuntimeError(f"Local file does not exist and fetching remote baseline from GitLab failed: {str(e)}")
 
         feeds = []
         with _file_lock:
