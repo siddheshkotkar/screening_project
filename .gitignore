@@ -23,3 +23,7 @@ yarn-error.log*
 .DS_Store?
 ehthumbs.db
 Thumbs.db
+
+# Application databases & sandbox session files
+backend/data/*.db
+backend/data/keywords_session_*.txt

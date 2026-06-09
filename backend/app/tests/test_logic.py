@@ -140,3 +140,70 @@ Old_Deprecated_Feed|SOME_OLD_KEYWORD|Deprecated BU||
     finally:
         if os.path.exists(gitlab_path):
             os.remove(gitlab_path)
+
+def test_password_hashing():
+    from app.services.auth_service import verify_password
+    from app.utils.db import hash_password
+    
+    password = "test_secure_password"
+    hashed = hash_password(password)
+    
+    assert verify_password(password, hashed) is True
+    assert verify_password("wrong_password", hashed) is False
+
+def test_database_helper_seeding():
+    from app.utils.db import DatabaseHelper
+    from app.services.auth_service import verify_password
+    
+    # Create temp DB file
+    fd, path = tempfile.mkstemp(suffix=".db", prefix="users_test_")
+    os.close(fd)
+    
+    try:
+        db = DatabaseHelper(path)
+        
+        # Verify master user was seeded
+        with db.get_connection() as conn:
+            cursor = conn.execute("SELECT username, password_hash FROM users WHERE username = 'master_user'")
+            row = cursor.fetchone()
+            assert row is not None
+            assert row["username"] == "master_user"
+            assert verify_password("password123", row["password_hash"]) is True
+    finally:
+        if os.path.exists(path):
+            os.remove(path)
+
+def test_session_lifecycle():
+    from app.utils.db import DatabaseHelper
+    from app.services.auth_service import AuthService
+    import app.services.auth_service as auth_service
+    
+    fd, path = tempfile.mkstemp(suffix=".db", prefix="users_test_")
+    os.close(fd)
+    
+    try:
+        # Swap db_helper inside auth_service with test db helper
+        original_helper = auth_service.db_helper
+        test_helper = DatabaseHelper(path)
+        auth_service.db_helper = test_helper
+        
+        username = "auth_test_user"
+        token = AuthService.create_session(username)
+        
+        assert token is not None
+        # Check mapping resolves
+        resolved = AuthService.get_username_by_token(token)
+        assert resolved == username
+        
+        # Delete session
+        AuthService.delete_session(token)
+        
+        # Checking now should raise exception
+        with pytest.raises(Exception):
+            AuthService.get_username_by_token(token)
+            
+        # Restore helper
+        auth_service.db_helper = original_helper
+    finally:
+        if os.path.exists(path):
+            os.remove(path)

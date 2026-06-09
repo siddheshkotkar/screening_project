@@ -4,7 +4,7 @@ import Toast from '../components/Toast';
 import Modal from '../components/Modal';
 import { PlusCircle, Trash2, Loader2, AlertCircle, Info } from 'lucide-react';
 
-const UpdateFile = () => {
+const UpdateFile = ({ setHasChanges }) => {
   // Global Feeds State
   const [feedsData, setFeedsData] = useState([]);
   const [feedsList, setFeedsList] = useState([]);
@@ -140,6 +140,7 @@ const UpdateFile = () => {
       });
       
       showToast(`Successfully added keyword "${keyword}" to feed "${feedName}".`);
+      if (setHasChanges) setHasChanges(true);
       setAddKeyword('');
       setShowAddModal(false);
       // Reload feeds to update state
@@ -187,6 +188,7 @@ const UpdateFile = () => {
         });
         showToast(`Globally removed keyword "${removeKeyword}" from all lists.`);
       }
+      if (setHasChanges) setHasChanges(true);
       // Reload feeds
       await loadData();
     } catch (err) {

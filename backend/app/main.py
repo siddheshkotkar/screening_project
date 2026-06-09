@@ -2,6 +2,7 @@ import uvicorn
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from app.routes.feeds import router as feeds_router
+from app.routes.auth import router as auth_router
 from app.config import settings
 
 app = FastAPI(
@@ -21,6 +22,7 @@ app.add_middleware(
 
 # Register routes
 app.include_router(feeds_router, tags=["Feeds"])
+app.include_router(auth_router, tags=["Auth"])
 
 @app.get("/")
 def read_root():

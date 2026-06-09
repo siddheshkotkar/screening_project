@@ -1,5 +1,5 @@
 import os
-from fastapi import APIRouter, HTTPException, Query, status
+from fastapi import APIRouter, HTTPException, Depends, status
 from typing import List
 
 from app.config import settings
@@ -13,20 +13,31 @@ from app.models.schemas import (
 )
 from app.services.file_service import FileService
 from app.services.comparison_service import ComparisonService
+from app.services.auth_service import get_current_user
+from app.routes.auth import get_session_file_path
 
 router = APIRouter()
 
-# Get local keywords file path relative to this file
-BASE_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-LOCAL_FILE_PATH = os.path.join(BASE_DIR, "data", "keywords.txt")
+def verify_session_file(username: str) -> str:
+    """
+    Checks if the user has an initialized session file and returns its path.
+    """
+    session_file = get_session_file_path(username)
+    if not os.path.exists(session_file):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Session not initialized. Please select a file source."
+        )
+    return session_file
 
 @router.get("/feeds", response_model=List[str])
-def get_feeds():
+def get_feeds(username: str = Depends(get_current_user)):
     """
-    Returns all feed names (IDs) from the local file.
+    Returns all feed names (IDs) from the user's active session file.
     """
+    session_file = verify_session_file(username)
     try:
-        feeds = FileService.load_feeds(LOCAL_FILE_PATH)
+        feeds = FileService.load_feeds(session_file)
         return [feed.id for feed in feeds]
     except Exception as e:
         raise HTTPException(
@@ -35,12 +46,13 @@ def get_feeds():
         )
 
 @router.get("/feeds/all", response_model=List[FeedSchema])
-def get_all_feeds():
+def get_all_feeds(username: str = Depends(get_current_user)):
     """
     Returns all feeds along with their keywords and details.
     """
+    session_file = verify_session_file(username)
     try:
-        return FileService.load_feeds(LOCAL_FILE_PATH)
+        return FileService.load_feeds(session_file)
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -48,12 +60,13 @@ def get_all_feeds():
         )
 
 @router.get("/feeds/{feed_name}/keywords", response_model=FeedKeywordsResponse)
-def get_feed_keywords(feed_name: str):
+def get_feed_keywords(feed_name: str, username: str = Depends(get_current_user)):
     """
     Returns the keywords list for a specific feed.
     """
+    session_file = verify_session_file(username)
     try:
-        feed = FileService.get_feed_by_name(LOCAL_FILE_PATH, feed_name)
+        feed = FileService.get_feed_by_name(session_file, feed_name)
         if not feed:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
@@ -69,13 +82,14 @@ def get_feed_keywords(feed_name: str):
         )
 
 @router.post("/keywords/add", response_model=FeedSchema)
-def add_keyword(payload: KeywordAddRequest):
+def add_keyword(payload: KeywordAddRequest, username: str = Depends(get_current_user)):
     """
-    Adds a keyword to a specific feed, and optionally to CLP and CORE_LIST if requested.
+    Adds a keyword to a specific feed in the user's sandbox session.
     """
+    session_file = verify_session_file(username)
     try:
         updated_feed = FileService.add_keyword(
-            file_path=LOCAL_FILE_PATH,
+            file_path=session_file,
             keyword=payload.keyword,
             feed_name=payload.feed_name,
             add_to_clp=payload.add_to_clp,
@@ -94,13 +108,14 @@ def add_keyword(payload: KeywordAddRequest):
         )
 
 @router.post("/keywords/remove-from-feed")
-def remove_keyword_from_feed(payload: KeywordRemoveFeedRequest):
+def remove_keyword_from_feed(payload: KeywordRemoveFeedRequest, username: str = Depends(get_current_user)):
     """
     Removes a keyword only from the selected feed.
     """
+    session_file = verify_session_file(username)
     try:
         FileService.remove_keyword_from_feed(
-            file_path=LOCAL_FILE_PATH,
+            file_path=session_file,
             keyword=payload.keyword,
             feed_name=payload.feed_name
         )
@@ -117,13 +132,14 @@ def remove_keyword_from_feed(payload: KeywordRemoveFeedRequest):
         )
 
 @router.post("/keywords/remove-completely")
-def remove_keyword_completely(payload: KeywordRemoveCompleteRequest):
+def remove_keyword_completely(payload: KeywordRemoveCompleteRequest, username: str = Depends(get_current_user)):
     """
-    Removes a keyword globally from all feeds and special lists.
+    Removes a keyword globally from all feeds and special lists in the user's sandbox session.
     """
+    session_file = verify_session_file(username)
     try:
         FileService.remove_keyword_globally(
-            file_path=LOCAL_FILE_PATH,
+            file_path=session_file,
             keyword=payload.keyword
         )
         return {"status": "success", "message": f"Keyword '{payload.keyword}' removed globally from all feeds and special lists."}
@@ -139,10 +155,11 @@ def remove_keyword_completely(payload: KeywordRemoveCompleteRequest):
         )
 
 @router.get("/compare", response_model=CompareResponse)
-def compare_local_with_gitlab():
+def compare_local_with_gitlab(username: str = Depends(get_current_user)):
     """
-    Compares the local file with the remote GitLab file.
+    Compares the user's active session file with the remote GitLab file.
     """
+    session_file = verify_session_file(username)
     try:
         url = settings.gitlab_file_url
         if not url:
@@ -152,7 +169,7 @@ def compare_local_with_gitlab():
             )
         
         diff_result = ComparisonService.compare_files(
-            local_path=LOCAL_FILE_PATH,
+            local_path=session_file,
             gitlab_url=url,
             token=settings.gitlab_token
         )

@@ -1,8 +1,8 @@
 import React from 'react';
 import { NavLink } from 'react-router-dom';
-import { ShieldCheck, Database, Sliders, RefreshCw, Layers, Sun, Moon } from 'lucide-react';
+import { ShieldCheck, Database, Sliders, RefreshCw, Layers, Sun, Moon, LogOut } from 'lucide-react';
 
-const Navbar = ({ theme, toggleTheme }) => {
+const Navbar = ({ theme, toggleTheme, username, onLogout }) => {
   return (
     <nav className="navbar">
       <div className="navbar-container">
@@ -41,6 +41,23 @@ const Navbar = ({ theme, toggleTheme }) => {
               <span>Compare GitLab</span>
             </NavLink>
           </li>
+          {username && (
+            <li className="nav-profile-item">
+              <span className="profile-label">Logged in as: <strong>{username}</strong></span>
+            </li>
+          )}
+          {username && (
+            <li className="nav-item">
+              <button 
+                className="logout-btn" 
+                onClick={onLogout}
+                title="Logout session"
+              >
+                <LogOut size={18} />
+                <span>Logout</span>
+              </button>
+            </li>
+          )}
           <li>
             <button 
               className="theme-toggle-btn" 
