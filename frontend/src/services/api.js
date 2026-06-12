@@ -7,10 +7,10 @@ const api = axios.create({
   },
 });
 
-// Automatically inject Bearer token from localStorage for all requests
+// Automatically inject Bearer token from sessionStorage for all requests
 api.interceptors.request.use(
   (config) => {
-    const token = localStorage.getItem('token');
+    const token = sessionStorage.getItem('token');
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
     }

@@ -18,15 +18,15 @@ function App() {
   });
 
   const [token, setToken] = useState(() => {
-    return localStorage.getItem('token') || null;
+    return sessionStorage.getItem('token') || null;
   });
 
   const [username, setUsername] = useState(() => {
-    return localStorage.getItem('username') || null;
+    return sessionStorage.getItem('username') || null;
   });
 
   const [hasSession, setHasSession] = useState(() => {
-    return localStorage.getItem('hasSession') === 'true';
+    return sessionStorage.getItem('hasSession') === 'true';
   });
 
   const [hasChanges, setHasChanges] = useState(false);
@@ -51,19 +51,19 @@ function App() {
       try {
         await api.get('/feeds');
         setHasSession(true);
-        localStorage.setItem('hasSession', 'true');
+        sessionStorage.setItem('hasSession', 'true');
       } catch (err) {
         if (err.response?.status === 401) {
           setToken(null);
           setUsername(null);
           setHasSession(false);
-          localStorage.clear();
+          sessionStorage.clear();
         } else if (
           err.response?.status === 400 &&
           err.response?.data?.detail?.includes("Session not initialized")
         ) {
           setHasSession(false);
-          localStorage.removeItem('hasSession');
+          sessionStorage.removeItem('hasSession');
         } else {
           // Other connection issue, don't clear token but assume no session for now
           setHasSession(false);
@@ -87,13 +87,13 @@ function App() {
             setUsername(null);
             setHasSession(false);
             setHasChanges(false);
-            localStorage.clear();
+            sessionStorage.clear();
           } else if (
             error.response.status === 400 &&
             error.response.data?.detail?.includes("Session not initialized")
           ) {
             setHasSession(false);
-            localStorage.removeItem('hasSession');
+            sessionStorage.removeItem('hasSession');
           }
         }
         return Promise.reject(error);
@@ -112,15 +112,15 @@ function App() {
   const handleLoginSuccess = (userToken, userName) => {
     setToken(userToken);
     setUsername(userName);
-    localStorage.setItem('token', userToken);
-    localStorage.setItem('username', userName);
+    sessionStorage.setItem('token', userToken);
+    sessionStorage.setItem('username', userName);
     // Trigger session check/loading
     setLoadingSession(true);
   };
 
   const handleSelectSuccess = () => {
     setHasSession(true);
-    localStorage.setItem('hasSession', 'true');
+    sessionStorage.setItem('hasSession', 'true');
   };
 
   const handleDownload = async () => {
@@ -153,7 +153,7 @@ function App() {
       setUsername(null);
       setHasSession(false);
       setHasChanges(false);
-      localStorage.clear();
+      sessionStorage.clear();
       setLoggingOut(false);
       setShowLogoutModal(false);
     }
