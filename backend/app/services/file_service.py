@@ -166,6 +166,65 @@ class FileService:
         return target_feed
 
     @classmethod
+    def add_keyword_to_multiple_feeds(cls, file_path: str, keyword: str, feed_names: List[str], add_to_clp: bool = False, add_to_core: bool = False) -> List[FeedSchema]:
+        """
+        Adds a keyword to multiple feeds, and optionally to CLP and CORE_LIST.
+        """
+        keyword = keyword.strip()
+        feeds = cls.load_feeds(file_path)
+        
+        # Validate that all requested feeds exist
+        target_feeds = []
+        for name in feed_names:
+            target_feed = None
+            for feed in feeds:
+                if feed.id.lower() == name.strip().lower():
+                    target_feed = feed
+                    break
+            if not target_feed:
+                raise ValueError(f"Feed '{name}' not found.")
+            target_feeds.append(target_feed)
+            
+        # Check duplicate in all target feeds first
+        for feed in target_feeds:
+            if any(k.lower() == keyword.lower() for k in feed.keywords):
+                raise ValueError(f"Keyword '{keyword}' already exists in feed '{feed.id}'.")
+                
+        # Add to target feeds
+        for feed in target_feeds:
+            feed.keywords.append(keyword)
+            
+        # CLP list check and update
+        if add_to_clp:
+            clp_feed = None
+            for feed in feeds:
+                if feed.id == "CLP":
+                    clp_feed = feed
+                    break
+            if clp_feed:
+                if not any(k.lower() == keyword.lower() for k in clp_feed.keywords):
+                    clp_feed.keywords.append(keyword)
+            else:
+                feeds.append(FeedSchema(id="CLP", keywords=[keyword], bu="CLP"))
+
+        # CORE_LIST list check and update
+        if add_to_core:
+            core_feed = None
+            for feed in feeds:
+                if feed.id == "CORE_LIST":
+                    core_feed = feed
+                    break
+            if core_feed:
+                if not any(k.lower() == keyword.lower() for k in core_feed.keywords):
+                    core_feed.keywords.append(keyword)
+            else:
+                feeds.append(FeedSchema(id="CORE_LIST", keywords=[keyword], bu="Core Policy Keywords"))
+
+        # Save updates
+        cls.save_feeds(file_path, feeds)
+        return target_feeds
+
+    @classmethod
     def remove_keyword_from_feed(cls, file_path: str, keyword: str, feed_name: str) -> None:
         """
         Removes a keyword from a specific feed.

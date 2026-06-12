@@ -16,7 +16,7 @@ const UpdateFile = ({ setHasChanges }) => {
 
   // Form State - Add Keyword
   const [addKeyword, setAddKeyword] = useState('');
-  const [addFeed, setAddFeed] = useState('');
+  const [addFeeds, setAddFeeds] = useState([]);
   const [submittingAdd, setSubmittingAdd] = useState(false);
 
   // Form State - Remove Keyword
@@ -50,7 +50,7 @@ const UpdateFile = ({ setHasChanges }) => {
       setFeedsList(resList.data);
 
       if (resList.data.length > 0) {
-        setAddFeed(resList.data[0]);
+        setAddFeeds([resList.data[0]]);
         setRemoveFeed(resList.data[0]);
       }
     } catch (err) {
@@ -96,21 +96,27 @@ const UpdateFile = ({ setHasChanges }) => {
   const handleAddSubmit = (e) => {
     e.preventDefault();
     const kw = addKeyword.trim();
-    const fd = addFeed;
 
     if (!kw) {
       showToast('Keyword must not be empty.', 'error');
       return;
     }
-    if (!fd) {
-      showToast('A feed must be selected.', 'error');
+    if (addFeeds.length === 0) {
+      showToast('At least one feed must be selected.', 'error');
       return;
     }
 
-    // Check if duplicate in selected feed
-    const targetFeedData = feedsData.find(f => f.id === fd);
-    if (targetFeedData && targetFeedData.keywords.some(k => k.toLowerCase() === kw.toLowerCase())) {
-      showToast(`Keyword "${kw}" already exists in feed "${fd}".`, 'error');
+    // Check duplicate in selected feeds
+    const duplicateFeeds = [];
+    addFeeds.forEach(feedName => {
+      const targetFeedData = feedsData.find(f => f.id === feedName);
+      if (targetFeedData && targetFeedData.keywords.some(k => k.toLowerCase() === kw.toLowerCase())) {
+        duplicateFeeds.push(feedName);
+      }
+    });
+
+    if (duplicateFeeds.length > 0) {
+      showToast(`Keyword "${kw}" already exists in feed(s): ${duplicateFeeds.join(', ')}.`, 'error');
       return;
     }
 
@@ -124,24 +130,25 @@ const UpdateFile = ({ setHasChanges }) => {
       setShowAddModal(true);
     } else {
       // Just submit directly
-      executeAddKeyword(kw, fd, false, false);
+      executeAddKeyword(kw, addFeeds, false, false);
     }
   };
 
   // API Call: Add Keyword
-  const executeAddKeyword = async (keyword, feedName, addToClp, addToCore) => {
+  const executeAddKeyword = async (keyword, feedNames, addToClp, addToCore) => {
     try {
       setSubmittingAdd(true);
-      await api.post('/keywords/add', {
+      await api.post('/keywords/add-multiple', {
         keyword,
-        feed_name: feedName,
+        feed_names: feedNames,
         add_to_clp: addToClp,
         add_to_core: addToCore
       });
       
-      showToast(`Successfully added keyword "${keyword}" to feed "${feedName}".`);
+      showToast(`Successfully added keyword "${keyword}" to ${feedNames.length} feed(s).`);
       if (setHasChanges) setHasChanges(true);
       setAddKeyword('');
+      setAddFeeds(feedsList.length > 0 ? [feedsList[0]] : []);
       setShowAddModal(false);
       // Reload feeds to update state
       await loadData();
@@ -155,7 +162,7 @@ const UpdateFile = ({ setHasChanges }) => {
   const handleConfirmAddModal = () => {
     executeAddKeyword(
       addKeyword.trim(),
-      addFeed,
+      addFeeds,
       addModalOptions.addToClp,
       addModalOptions.addToCore
     );
@@ -274,21 +281,52 @@ const UpdateFile = ({ setHasChanges }) => {
                 </div>
 
                 <div className="form-group">
-                  <label htmlFor="add-feed-select" className="input-label">
-                    Target Feed
-                  </label>
-                  <select
-                    id="add-feed-select"
-                    value={addFeed}
-                    onChange={(e) => setAddFeed(e.target.value)}
-                    className="form-select"
-                  >
-                    {feedsList.map(feed => (
-                      <option key={feed} value={feed}>
-                        {feed}
-                      </option>
-                    ))}
-                  </select>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                    <label className="input-label" style={{ marginBottom: 0 }}>Target Feeds (Select one or more)</label>
+                    <div style={{ display: 'flex', gap: '6px' }}>
+                      <button 
+                        type="button" 
+                        onClick={() => setAddFeeds(feedsList)} 
+                        className="btn btn-secondary btn-xs"
+                        style={{ padding: '3px 8px', fontSize: '0.7rem' }}
+                      >
+                        Select All
+                      </button>
+                      <button 
+                        type="button" 
+                        onClick={() => setAddFeeds([])} 
+                        className="btn btn-secondary btn-xs"
+                        style={{ padding: '3px 8px', fontSize: '0.7rem' }}
+                      >
+                        Clear All
+                      </button>
+                    </div>
+                  </div>
+                  <div className="feeds-toggle-group" style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', padding: '12px', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-sm)', background: 'rgba(0,0,0,0.1)' }}>
+                    {feedsList.map(feed => {
+                      const isSelected = addFeeds.includes(feed);
+                      return (
+                        <button
+                          key={feed}
+                          type="button"
+                          onClick={() => {
+                            setAddFeeds(prev => 
+                              prev.includes(feed) 
+                                ? prev.filter(f => f !== feed) 
+                                : [...prev, feed]
+                            );
+                          }}
+                          className={`feed-toggle-pill ${isSelected ? 'active' : ''}`}
+                          style={{ padding: '6px 14px', fontSize: '0.8rem' }}
+                        >
+                          <span>{feed}</span>
+                          {(feed === 'CLP' || feed === 'CORE_LIST') && (
+                            <span className="pill-badge">Special</span>
+                          )}
+                        </button>
+                      );
+                    })}
+                  </div>
                 </div>
 
                 <button 

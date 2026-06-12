@@ -32,6 +32,25 @@ class KeywordAddRequest(BaseModel):
             raise ValueError("Feed name must be selected")
         return val
 
+class KeywordAddMultipleRequest(BaseModel):
+    keyword: str
+    feed_names: List[str]
+    add_to_clp: bool = False
+    add_to_core: bool = False
+
+    @field_validator("keyword")
+    def validate_keyword(cls, v):
+        val = v.strip()
+        if not val:
+            raise ValueError("Keyword must not be empty")
+        return val
+
+    @field_validator("feed_names")
+    def validate_feeds(cls, v):
+        if not v or not [name.strip() for name in v if name.strip()]:
+            raise ValueError("At least one feed name must be selected")
+        return [name.strip() for name in v if name.strip()]
+
 class KeywordRemoveFeedRequest(BaseModel):
     keyword: str
     feed_name: str

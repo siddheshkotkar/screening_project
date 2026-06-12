@@ -207,3 +207,32 @@ def test_session_lifecycle():
     finally:
         if os.path.exists(path):
             os.remove(path)
+
+def test_add_keyword_multiple_feeds(temp_keywords_file):
+    # Add new keyword to both Barclaycard_BPAY and Barclaycard_BPAID
+    FileService.add_keyword_to_multiple_feeds(
+        temp_keywords_file, 
+        keyword="MULTI_KEY", 
+        feed_names=["Barclaycard_BPAY", "Barclaycard_BPAID"]
+    )
+    
+    # Check it exists in both
+    assert FileService.keyword_exists_in_feed(temp_keywords_file, "Barclaycard_BPAY", "MULTI_KEY") is True
+    assert FileService.keyword_exists_in_feed(temp_keywords_file, "Barclaycard_BPAID", "MULTI_KEY") is True
+    
+    # Verify error on duplicate addition to either
+    with pytest.raises(ValueError, match="already exists"):
+        FileService.add_keyword_to_multiple_feeds(
+            temp_keywords_file, 
+            keyword="MULTI_KEY", 
+            feed_names=["Barclaycard_BPAY", "CORE_LIST"]
+        )
+
+    # Add keyword to multiple feeds with CLP propagation
+    FileService.add_keyword_to_multiple_feeds(
+        temp_keywords_file,
+        keyword="CLP_MULTI",
+        feed_names=["Barclaycard_BPAY", "Barclaycard_BPAID"],
+        add_to_clp=True
+    )
+    assert FileService.keyword_exists_in_feed(temp_keywords_file, "CLP", "CLP_MULTI") is True

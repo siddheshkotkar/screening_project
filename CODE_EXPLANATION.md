@@ -28,7 +28,7 @@ Initializes the SQLite3 local database, constructs the schemas, and seeds the in
 * **`hash_password(password: str)`**:
   * Generates a random 16-byte salt via `os.urandom(16)`.
   * Computes a secure hash of the password using **PBKDF2-HMAC-SHA256** with `100,000` iterations.
-  * Returns the salt and key concatenated as hex strings: `salt_hex:key_hex` (e.g. `a1c2...:b4d5...`). This format allows verifying passwords without storing them in cleartext.
+  * Returns the salt and key concatenated as hex strings: `salt_hex:key_hex`. This format allows verifying passwords without storing them in cleartext.
 * **`DatabaseHelper` Class**:
   * `__init__(self, db_path: str)`: Configures the location of the `.db` file (saved under `backend/data/users.db`).
   * `get_connection(self)`: Context manager yielding an active sqlite3 connection. It sets `row_factory = sqlite3.Row` so query results return as key-value structures rather than raw index tuples.
@@ -77,8 +77,6 @@ Manages thread-safe parsing, formatting, propagation, and writing of pipe-delimi
   * If the row has 2 columns (such as `CLP` or `CORE_LIST` lists), parses it with `bu=None` and keywords split by `;`.
 * **`serialize_feed(feed: FeedSchema)`**:
   * Converts the internal Python `FeedSchema` structure back into a pipe-delimited text line.
-  * Formats keywords joined by semicolons (`;`).
-  * If Business Unit is available, writes `ID|BU|Keywords`. If missing, writes `ID|Keywords`.
 * **`FileService.load_feeds(file_path: str)`**:
   * Reads the entire keywords file line-by-line.
   * Skips empty lines and comment headers (lines starting with `#`).
@@ -86,18 +84,13 @@ Manages thread-safe parsing, formatting, propagation, and writing of pipe-delimi
 * **`FileService.save_feeds(file_path: str, feeds: List[FeedSchema])`**:
   * Writes feeds back to the disk.
   * Ensures that a thread-safe lock is acquired during write cycles to prevent concurrent write collisions.
-  * Includes default header comments (`# ID|BU|Keywords` and `# ID|Keywords`).
-* **`FileService.add_keyword(file_path, keyword, feed_name, add_to_clp, add_to_core)`**:
-  * Loads all active feeds using `load_feeds()`.
-  * Checks for duplicates: raises a `ValueError` if the keyword already exists in the target feed.
-  * Appends the keyword to the target feed.
-  * **Propagation checks**:
-    * If `add_to_clp` is selected, appends it to the `CLP` special feed list.
-    * If `add_to_core` is selected, appends it to the `CORE_LIST` core policy feed list.
-  * Calls `save_feeds()` to commit changes to the user's sandboxed text file.
-* **`FileService.remove_keyword_from_feed(file_path, keyword, feed_name)`**:
-  * Loads active feeds, filters the selected keyword out of the target feed, and saves the file.
-* **`FileService.remove_keyword_globally(file_path, keyword)`**:
+* **`FileService.add_keyword(...)`**:
+  * Adds a keyword to a target feed, checking for duplicates. Optionally propagates the keyword to special lists (`CLP`, `CORE_LIST`).
+* **`FileService.add_keyword_to_multiple_feeds(...)`**:
+  * Adds a keyword to multiple feeds, validating that all target feeds exist and check for duplicate collisions. Optionally propagates to `CLP` and `CORE_LIST`.
+* **`FileService.remove_keyword_from_feed(...)`**:
+  * Removes a keyword from a specific feed.
+* **`FileService.remove_keyword_globally(...)`**:
   * Iterates through all feeds (including special rows like `CLP` and `CORE_LIST`) and deletes all occurrences of the keyword system-wide.
 
 ---
@@ -110,20 +103,10 @@ Fetches baseline file content from the remote GitLab repository and performs det
 ### Key Components & Code explanation
 * **`fetch_remote_file(url, token)`**:
   * Fires an HTTP GET request to retrieve raw file text from GitLab.
-  * **SSL Certification bypass**: Configures a custom `ssl.SSLContext` setup using `ssl.CERT_NONE` to handle corporate proxies or self-signed certificate environments securely.
-  * Attaches authorization headers if a token is configured.
-  * If the URL contains `example.com` (default stub url), returns a mock baseline string simulating a remote file for offline development.
+  * Configures a custom `ssl.SSLContext` setup using `ssl.CERT_NONE` to handle corporate proxies or self-signed certificate environments securely.
 * **`compare_files(local_path, gitlab_url, token)`**:
   * Loads local sandboxed feeds via `FileService.load_feeds(local_path)`.
-  * Retrieves remote GitLab file contents via `fetch_remote_file()` and parses them using `parse_content()`.
-  * Organizes feeds into dictionaries mapping `FeedID -> Keywords`.
-  * Computes diff analysis:
-    * **Added Feeds**: Feeds present in local copy but missing in GitLab.
-    * **Removed Feeds**: Feeds present in GitLab but missing in local copy.
-    * **Modified Feeds**: Feeds present in both, but having difference in keywords. Computes exactly:
-      * `added_keywords`: Keywords added in the local version.
-      * `removed_keywords`: Keywords deleted from the local version.
-    * **Unchanged Feeds**: Feeds with identical keyword lists.
+  * Retrieves remote GitLab file contents and computes Added, Removed, and Modified feeds/keywords.
 
 ---
 
@@ -134,22 +117,15 @@ Declares the endpoint routes managing accounts, session creation, and downloads.
 
 ### Key Components & Code explanation
 * **`POST /auth/signup`**:
-  * Validates credentials length.
-  * Checks if the username exists in the database.
   * Hashes password using `hash_password()` and saves record to the `users` table.
 * **`POST /auth/login`**:
-  * Fetches `password_hash` from the SQLite database.
-  * Verifies credentials via `verify_password()`.
-  * Registers session via `AuthService.create_session()`, returning the token UUID.
+  * Verifies credentials and registers session via `AuthService.create_session()`, returning the token UUID.
 * **`POST /auth/logout`**:
-  * Protected via token. Invalidation deletes the token row from the `sessions` database.
-  * **Cleanup sandbox**: Deletes the session text file `keywords_session_{username}.txt` from the server disk.
+  * Protected via token. Invalidation deletes the token row from the `sessions` database and deletes the user's `keywords_session_{username}.txt` sandbox file.
 * **`POST /session/initialize`**:
-  * Triggers during the Source Selection phase on the frontend.
-  * **Option `"master"`**: Fetches remote baseline from GitLab and writes it to `keywords_session_{username}.txt`.
-  * **Option `"local"`**: Accepts an uploaded text file, validates the `ID|Keywords` headers, and serializes the clean parsed content as the local sandbox file.
+  * Instantiates the user's sandbox file from GitLab (Option `"master"`) or uploaded text files (Option `"local"`).
 * **`GET /session/download`**:
-  * Protected endpoint returning `keywords_session_{username}.txt` as a downloadable attachment stream (`FileResponse`).
+  * Streams the user's active session text file as a downloadable attachment stream (`FileResponse`).
 
 ---
 
@@ -160,21 +136,13 @@ Routes queries, additions, deletions, and comparisons.
 
 ### Core Endpoints & Dependency Injection
 All routes inject `username: str = Depends(get_current_user)`.
-* **`verify_session_file(username)`**:
-  * Shared function checking if `keywords_session_{username}.txt` exists. If not, raises an HTTP 400 error indicating session workspace is uninitialized.
-* **`GET /feeds`**:
-  * Returns list of active feed names (IDs) inside the user's sandbox file.
-* **`GET /feeds/all`**:
-  * Returns full list of feeds and keywords details.
-* **`POST /keywords/add`**:
-  * Receives keyword addition details (feed name, propagation options).
-  * Routes parameters directly to `FileService.add_keyword()`.
-* **`POST /keywords/remove-from-feed`**:
-  * Routes parameters directly to `FileService.remove_keyword_from_feed()`.
-* **`POST /keywords/remove-completely`**:
-  * Purges keywords globally via `FileService.remove_keyword_globally()`.
-* **`GET /compare`**:
-  * Passes the local user path and remote URL targets to the diff engine `ComparisonService.compare_files()`, returning a structured JSON diff report.
+* **`GET /feeds`**: Returns list of active feed names (IDs).
+* **`GET /feeds/all`**: Returns full list of feeds and keywords details.
+* **`POST /keywords/add`**: Add a keyword to a single feed.
+* **`POST /keywords/add-multiple`**: Add a keyword to multiple target feeds simultaneously (validates that all selected feeds exist and are free from duplication).
+* **`POST /keywords/remove-from-feed`**: Remove a keyword from a single feed.
+* **`POST /keywords/remove-completely`**: Purge keywords globally.
+* **`GET /compare`**: Diff local user path and remote URL targets, returning a JSON report.
 
 ---
 
@@ -182,12 +150,4 @@ All routes inject `username: str = Depends(get_current_user)`.
 
 ### Purpose
 Configures the main web app gateway.
-
-### Code Explanation
-* **Startup Event Handler**:
-  * Listens to server startup.
-  * Triggers database tables creation and default credential checks by invoking `db_helper.init_db()`.
-* **Middleware**:
-  * Registers CORS middleware configuration allowing requests from the frontend client port (`5173`) to prevent browser blocking.
-* **Router Registrations**:
-  * Includes the authentication router (`app.routes.auth`) and keywords router (`app.routes.feeds`).
+* Configures database tables startup, CORS permissions, and routes bindings.

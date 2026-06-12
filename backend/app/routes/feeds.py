@@ -7,6 +7,7 @@ from app.models.schemas import (
     FeedSchema,
     FeedKeywordsResponse,
     KeywordAddRequest,
+    KeywordAddMultipleRequest,
     KeywordRemoveFeedRequest,
     KeywordRemoveCompleteRequest,
     CompareResponse
@@ -105,6 +106,32 @@ def add_keyword(payload: KeywordAddRequest, username: str = Depends(get_current_
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to add keyword: {str(e)}"
+        )
+
+@router.post("/keywords/add-multiple")
+def add_keyword_multiple(payload: KeywordAddMultipleRequest, username: str = Depends(get_current_user)):
+    """
+    Adds a keyword to multiple feeds in the user's sandbox session.
+    """
+    session_file = verify_session_file(username)
+    try:
+        updated_feeds = FileService.add_keyword_to_multiple_feeds(
+            file_path=session_file,
+            keyword=payload.keyword,
+            feed_names=payload.feed_names,
+            add_to_clp=payload.add_to_clp,
+            add_to_core=payload.add_to_core
+        )
+        return {"status": "success", "message": f"Successfully added keyword to {len(updated_feeds)} feeds.", "feeds": updated_feeds}
+    except ValueError as ve:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(ve)
+        )
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to add keyword to multiple feeds: {str(e)}"
         )
 
 @router.post("/keywords/remove-from-feed")
