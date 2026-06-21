@@ -9,6 +9,7 @@ from app.models.schemas import (
     KeywordAddRequest,
     KeywordAddMultipleRequest,
     KeywordRemoveFeedRequest,
+    KeywordRemoveMultipleRequest,
     KeywordRemoveCompleteRequest,
     CompareResponse
 )
@@ -156,6 +157,30 @@ def remove_keyword_from_feed(payload: KeywordRemoveFeedRequest, username: str = 
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to remove keyword: {str(e)}"
+        )
+
+@router.post("/keywords/remove-from-multiple-feeds")
+def remove_keyword_from_multiple_feeds_route(payload: KeywordRemoveMultipleRequest, username: str = Depends(get_current_user)):
+    """
+    Removes a keyword from multiple feeds in the user's sandbox session.
+    """
+    session_file = verify_session_file(username)
+    try:
+        FileService.remove_keyword_from_multiple_feeds(
+            file_path=session_file,
+            keyword=payload.keyword,
+            feed_names=payload.feed_names
+        )
+        return {"status": "success", "message": f"Successfully removed keyword '{payload.keyword}' from {len(payload.feed_names)} feeds."}
+    except ValueError as ve:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(ve)
+        )
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to remove keyword from multiple feeds: {str(e)}"
         )
 
 @router.post("/keywords/remove-completely")

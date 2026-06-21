@@ -236,3 +236,24 @@ def test_add_keyword_multiple_feeds(temp_keywords_file):
         add_to_clp=True
     )
     assert FileService.keyword_exists_in_feed(temp_keywords_file, "CLP", "CLP_MULTI") is True
+
+def test_remove_keyword_multiple_feeds(temp_keywords_file):
+    # Barclaycard_BPAY and Barclaycard_BPAID both have "EU" by default
+    # Let's remove "EU" from both
+    FileService.remove_keyword_from_multiple_feeds(
+        temp_keywords_file,
+        keyword="EU",
+        feed_names=["Barclaycard_BPAY", "Barclaycard_BPAID"]
+    )
+    
+    # Verify keyword is gone from both
+    assert FileService.keyword_exists_in_feed(temp_keywords_file, "Barclaycard_BPAY", "EU") is False
+    assert FileService.keyword_exists_in_feed(temp_keywords_file, "Barclaycard_BPAID", "EU") is False
+    
+    # Verify exception if trying to remove non-existent keyword from one of them
+    with pytest.raises(ValueError, match="not found"):
+        FileService.remove_keyword_from_multiple_feeds(
+            temp_keywords_file,
+            keyword="EU",
+            feed_names=["Barclaycard_BPAY", "CLP"]
+        )

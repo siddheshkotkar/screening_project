@@ -21,7 +21,7 @@ const UpdateFile = ({ setHasChanges }) => {
 
   // Form State - Remove Keyword
   const [removeMode, setRemoveMode] = useState('specific'); // 'specific' or 'global'
-  const [removeFeed, setRemoveFeed] = useState('');
+  const [removeFeeds, setRemoveFeeds] = useState([]);
   const [removeKeyword, setRemoveKeyword] = useState('');
   const [submittingRemove, setSubmittingRemove] = useState(false);
 
@@ -51,7 +51,7 @@ const UpdateFile = ({ setHasChanges }) => {
 
       if (resList.data.length > 0) {
         setAddFeeds([resList.data[0]]);
-        setRemoveFeed(resList.data[0]);
+        setRemoveFeeds([resList.data[0]]);
       }
     } catch (err) {
       setError('Failed to load configuration. Please verify backend state.');
@@ -64,16 +64,24 @@ const UpdateFile = ({ setHasChanges }) => {
     loadData();
   }, []);
 
-  // Update remove keyword selection based on selected feed
-  const selectedRemoveFeedKeywords = feedsData.find(f => f.id === removeFeed)?.keywords || [];
+  // Get all unique keywords present in ANY of the selected removeFeeds
+  const selectedRemoveFeedsKeywords = Array.from(
+    new Set(
+      feedsData
+        .filter(f => removeFeeds.includes(f.id))
+        .flatMap(f => f.keywords)
+    )
+  ).sort();
 
   useEffect(() => {
-    if (selectedRemoveFeedKeywords.length > 0) {
-      setRemoveKeyword(selectedRemoveFeedKeywords[0]);
+    if (selectedRemoveFeedsKeywords.length > 0) {
+      if (!selectedRemoveFeedsKeywords.includes(removeKeyword)) {
+        setRemoveKeyword(selectedRemoveFeedsKeywords[0]);
+      }
     } else {
       setRemoveKeyword('');
     }
-  }, [removeFeed, feedsData]);
+  }, [removeFeeds, feedsData]);
 
   // Toast Helper
   const showToast = (message, type = 'success') => {
@@ -171,6 +179,10 @@ const UpdateFile = ({ setHasChanges }) => {
   // Remove Keyword Submit Click
   const handleRemoveSubmit = (e) => {
     e.preventDefault();
+    if (removeMode === 'specific' && removeFeeds.length === 0) {
+      showToast('At least one feed must be selected.', 'error');
+      return;
+    }
     if (!removeKeyword.trim()) {
       showToast('Please select or input a keyword to remove.', 'error');
       return;
@@ -184,11 +196,11 @@ const UpdateFile = ({ setHasChanges }) => {
     try {
       setSubmittingRemove(true);
       if (removeMode === 'specific') {
-        await api.post('/keywords/remove-from-feed', {
+        await api.post('/keywords/remove-from-multiple-feeds', {
           keyword: removeKeyword,
-          feed_name: removeFeed
+          feed_names: removeFeeds
         });
-        showToast(`Removed keyword "${removeKeyword}" from feed "${removeFeed}".`);
+        showToast(`Removed keyword "${removeKeyword}" from ${removeFeeds.length} feed(s).`);
       } else {
         await api.post('/keywords/remove-completely', {
           keyword: removeKeyword
@@ -358,8 +370,8 @@ const UpdateFile = ({ setHasChanges }) => {
                         checked={removeMode === 'specific'}
                         onChange={() => {
                           setRemoveMode('specific');
-                          if (selectedRemoveFeedKeywords.length > 0) {
-                            setRemoveKeyword(selectedRemoveFeedKeywords[0]);
+                          if (selectedRemoveFeedsKeywords.length > 0) {
+                            setRemoveKeyword(selectedRemoveFeedsKeywords[0]);
                           } else {
                             setRemoveKeyword('');
                           }
@@ -393,31 +405,62 @@ const UpdateFile = ({ setHasChanges }) => {
                 {removeMode === 'specific' ? (
                   <>
                     <div className="form-group">
-                      <label htmlFor="remove-feed-select" className="input-label">
-                        Select Target Feed
-                      </label>
-                      <select
-                        id="remove-feed-select"
-                        value={removeFeed}
-                        onChange={(e) => setRemoveFeed(e.target.value)}
-                        className="form-select"
-                      >
-                        {feedsList.map(feed => (
-                          <option key={feed} value={feed}>
-                            {feed}
-                          </option>
-                        ))}
-                      </select>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                        <label className="input-label" style={{ marginBottom: 0 }}>Target Feeds (Select one or more)</label>
+                        <div style={{ display: 'flex', gap: '6px' }}>
+                          <button 
+                            type="button" 
+                            onClick={() => setRemoveFeeds(feedsList)} 
+                            className="btn btn-secondary btn-xs"
+                            style={{ padding: '3px 8px', fontSize: '0.7rem' }}
+                          >
+                            Select All
+                          </button>
+                          <button 
+                            type="button" 
+                            onClick={() => setRemoveFeeds([])} 
+                            className="btn btn-secondary btn-xs"
+                            style={{ padding: '3px 8px', fontSize: '0.7rem' }}
+                          >
+                            Clear All
+                          </button>
+                        </div>
+                      </div>
+                      <div className="feeds-toggle-group" style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', padding: '12px', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-sm)', background: 'rgba(0,0,0,0.1)' }}>
+                        {feedsList.map(feed => {
+                          const isSelected = removeFeeds.includes(feed);
+                          return (
+                            <button
+                              key={feed}
+                              type="button"
+                              onClick={() => {
+                                setRemoveFeeds(prev => 
+                                  prev.includes(feed) 
+                                    ? prev.filter(f => f !== feed) 
+                                    : [...prev, feed]
+                                );
+                              }}
+                              className={`feed-toggle-pill ${isSelected ? 'active' : ''}`}
+                              style={{ padding: '6px 14px', fontSize: '0.8rem' }}
+                            >
+                              <span>{feed}</span>
+                              {(feed === 'CLP' || feed === 'CORE_LIST') && (
+                                <span className="pill-badge">Special</span>
+                              )}
+                            </button>
+                          );
+                        })}
+                      </div>
                     </div>
 
                     <div className="form-group">
                       <label htmlFor="remove-keyword-select" className="input-label">
                         Select Keyword to Remove
                       </label>
-                      {selectedRemoveFeedKeywords.length === 0 ? (
+                      {selectedRemoveFeedsKeywords.length === 0 ? (
                         <div className="alert-info-box">
                           <Info size={16} />
-                          <span>No keywords exist in this feed to remove.</span>
+                          <span>No keywords exist in the selected feeds to remove.</span>
                         </div>
                       ) : (
                         <select
@@ -426,7 +469,7 @@ const UpdateFile = ({ setHasChanges }) => {
                           onChange={(e) => setRemoveKeyword(e.target.value)}
                           className="form-select"
                         >
-                          {selectedRemoveFeedKeywords.map(kw => (
+                          {selectedRemoveFeedsKeywords.map(kw => (
                             <option key={kw} value={kw}>
                               {kw}
                             </option>
@@ -559,7 +602,7 @@ const UpdateFile = ({ setHasChanges }) => {
           </p>
           {removeMode === 'specific' ? (
             <p>
-              You are about to remove <strong>"{removeKeyword}"</strong> from feed <strong>"{removeFeed}"</strong>. This action only modifies this feed.
+              You are about to remove <strong>"{removeKeyword}"</strong> from feed(s): <strong>{removeFeeds.join(', ')}</strong>. This action only modifies the selected feed(s).
             </p>
           ) : (
             <div className="destructive-warning-box">

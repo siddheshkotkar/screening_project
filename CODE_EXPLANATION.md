@@ -90,6 +90,8 @@ Manages thread-safe parsing, formatting, propagation, and writing of pipe-delimi
   * Adds a keyword to multiple feeds, validating that all target feeds exist and check for duplicate collisions. Optionally propagates to `CLP` and `CORE_LIST`.
 * **`FileService.remove_keyword_from_feed(...)`**:
   * Removes a keyword from a specific feed.
+* **`FileService.remove_keyword_from_multiple_feeds(...)`**:
+  * Removes a keyword from multiple selected feeds concurrently, verifying keyword presence to preserve execution atomicity.
 * **`FileService.remove_keyword_globally(...)`**:
   * Iterates through all feeds (including special rows like `CLP` and `CORE_LIST`) and deletes all occurrences of the keyword system-wide.
 
@@ -141,6 +143,7 @@ All routes inject `username: str = Depends(get_current_user)`.
 * **`POST /keywords/add`**: Add a keyword to a single feed.
 * **`POST /keywords/add-multiple`**: Add a keyword to multiple target feeds simultaneously (validates that all selected feeds exist and are free from duplication).
 * **`POST /keywords/remove-from-feed`**: Remove a keyword from a single feed.
+* **`POST /keywords/remove-from-multiple-feeds`**: Remove a keyword from multiple feeds simultaneously.
 * **`POST /keywords/remove-completely`**: Purge keywords globally.
 * **`GET /compare`**: Diff local user path and remote URL targets, returning a JSON report.
 

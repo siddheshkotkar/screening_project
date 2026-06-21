@@ -255,6 +255,44 @@ class FileService:
         cls.save_feeds(file_path, feeds)
 
     @classmethod
+    def remove_keyword_from_multiple_feeds(cls, file_path: str, keyword: str, feed_names: List[str]) -> None:
+        """
+        Removes a keyword from multiple feeds.
+        """
+        keyword = keyword.strip()
+        feeds = cls.load_feeds(file_path)
+        
+        # Verify that all feeds exist
+        target_feeds = []
+        for name in feed_names:
+            target_feed = None
+            for feed in feeds:
+                if feed.id.lower() == name.strip().lower():
+                    target_feed = feed
+                    break
+            if not target_feed:
+                raise ValueError(f"Feed '{name}' not found.")
+            target_feeds.append(target_feed)
+            
+        # Verify keyword presence in all target feeds to ensure atomicity
+        for feed in target_feeds:
+            has_kw = any(k.lower() == keyword.lower() for k in feed.keywords)
+            if not has_kw:
+                raise ValueError(f"Keyword '{keyword}' not found in feed '{feed.id}'.")
+                
+        # Perform deletion
+        for feed in target_feeds:
+            matched_k = None
+            for k in feed.keywords:
+                if k.lower() == keyword.lower():
+                    matched_k = k
+                    break
+            if matched_k:
+                feed.keywords.remove(matched_k)
+                
+        cls.save_feeds(file_path, feeds)
+
+    @classmethod
     def remove_keyword_globally(cls, file_path: str, keyword: str) -> None:
         """
         Removes a keyword globally from all feeds, CLP, CORE_LIST, and other lists.

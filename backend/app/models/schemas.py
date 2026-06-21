@@ -62,6 +62,23 @@ class KeywordRemoveFeedRequest(BaseModel):
             raise ValueError("Values must not be empty")
         return val
 
+class KeywordRemoveMultipleRequest(BaseModel):
+    keyword: str
+    feed_names: List[str]
+
+    @field_validator("keyword")
+    def validate_keyword(cls, v):
+        val = v.strip()
+        if not val:
+            raise ValueError("Keyword must not be empty")
+        return val
+
+    @field_validator("feed_names")
+    def validate_feeds(cls, v):
+        if not v or not [name.strip() for name in v if name.strip()]:
+            raise ValueError("At least one feed name must be selected")
+        return [name.strip() for name in v if name.strip()]
+
 class KeywordRemoveCompleteRequest(BaseModel):
     keyword: str
 
