@@ -505,7 +505,7 @@ const UpdateFile = ({ setHasChanges }) => {
 
                 <button 
                   type="submit" 
-                  disabled={submittingRemove || (removeMode === 'specific' && selectedRemoveFeedKeywords.length === 0)}
+                  disabled={submittingRemove || (removeMode === 'specific' && selectedRemoveFeedsKeywords.length === 0)}
                   className="btn btn-danger submit-btn"
                 >
                   {submittingRemove ? (
