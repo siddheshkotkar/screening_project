@@ -54,21 +54,18 @@ const UpdateFile = ({ setHasChanges }) => {
     name: 'project_16293_bot',
     file_path_in_repo: 'current/refData/Keywords and Lists.txt',
     jiraNumber: 'GCWS-31803',
-    version: 'V5',
     branch: 'feature/Keyword_Auto_V5',
     commit_message: 'GCWS-31803',
     tag_name: 'delta_build_GCWS-31803V5'
   });
 
-  const handleJiraOrVersionChange = (field, value) => {
+  const handleJiraNumberChange = (value) => {
     setDeployFormData(prev => {
-      const updated = { ...prev, [field]: value };
-      const jira = updated.jiraNumber.trim();
-      const ver = updated.version.trim();
+      const updated = { ...prev, jiraNumber: value };
+      const jira = value.strip ? value.strip() : value.trim();
       
-      updated.branch = `feature/Keyword_Auto_${ver}`;
       updated.commit_message = jira;
-      updated.tag_name = `delta_build_${jira}${ver}`;
+      updated.tag_name = `delta_build_${jira}V5`;
       return updated;
     });
   };
@@ -773,70 +770,13 @@ const UpdateFile = ({ setHasChanges }) => {
                           style={{ borderColor: 'var(--text-warning)' }}
                           placeholder="e.g. GCWS-31803"
                           value={deployFormData.jiraNumber}
-                          onChange={(e) => handleJiraOrVersionChange('jiraNumber', e.target.value)}
+                          onChange={(e) => handleJiraNumberChange(e.target.value)}
                           required
                         />
                       </div>
 
                       <div className="form-group">
-                        <label className="form-label" style={{ color: 'var(--text-primary)', fontWeight: 'bold' }}>Version</label>
-                        <input 
-                          type="text" 
-                          className="form-input" 
-                          style={{ borderColor: 'var(--text-warning)' }}
-                          placeholder="e.g. V5"
-                          value={deployFormData.version}
-                          onChange={(e) => handleJiraOrVersionChange('version', e.target.value)}
-                          required
-                        />
-                      </div>
-
-                      <div className="form-group">
-                        <label className="form-label">Repository URL</label>
-                        <input 
-                          type="text" 
-                          className="form-input" 
-                          value={deployFormData.repo_url}
-                          onChange={(e) => setDeployFormData(prev => ({ ...prev, repo_url: e.target.value }))}
-                          required
-                        />
-                      </div>
-                      
-                      <div className="form-group">
-                        <label className="form-label">GitLab Token</label>
-                        <input 
-                          type="password" 
-                          className="form-input" 
-                          value={deployFormData.token}
-                          onChange={(e) => setDeployFormData(prev => ({ ...prev, token: e.target.value }))}
-                          required
-                        />
-                      </div>
-                      
-                      <div className="form-group">
-                        <label className="form-label">Git Config User Email</label>
-                        <input 
-                          type="email" 
-                          className="form-input" 
-                          value={deployFormData.email}
-                          onChange={(e) => setDeployFormData(prev => ({ ...prev, email: e.target.value }))}
-                          required
-                        />
-                      </div>
-                      
-                      <div className="form-group">
-                        <label className="form-label">Git Config User Name</label>
-                        <input 
-                          type="text" 
-                          className="form-input" 
-                          value={deployFormData.name}
-                          onChange={(e) => setDeployFormData(prev => ({ ...prev, name: e.target.value }))}
-                          required
-                        />
-                      </div>
-                      
-                      <div className="form-group">
-                        <label className="form-label">Feature Branch Name (Auto-derived)</label>
+                        <label className="form-label">Feature Branch Name</label>
                         <input 
                           type="text" 
                           className="form-input" 
@@ -847,18 +787,7 @@ const UpdateFile = ({ setHasChanges }) => {
                       </div>
                       
                       <div className="form-group">
-                        <label className="form-label">Target File Path in Repo</label>
-                        <input 
-                          type="text" 
-                          className="form-input" 
-                          value={deployFormData.file_path_in_repo}
-                          onChange={(e) => setDeployFormData(prev => ({ ...prev, file_path_in_repo: e.target.value }))}
-                          required
-                        />
-                      </div>
-                      
-                      <div className="form-group">
-                        <label className="form-label">Commit Message (Auto-derived)</label>
+                        <label className="form-label">Commit Message</label>
                         <input 
                           type="text" 
                           className="form-input" 
@@ -869,7 +798,7 @@ const UpdateFile = ({ setHasChanges }) => {
                       </div>
                       
                       <div className="form-group">
-                        <label className="form-label">Tag Name (Auto-derived)</label>
+                        <label className="form-label">Tag Name</label>
                         <input 
                           type="text" 
                           className="form-input" 
