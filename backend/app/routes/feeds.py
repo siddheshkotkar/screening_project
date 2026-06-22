@@ -11,10 +11,12 @@ from app.models.schemas import (
     KeywordRemoveFeedRequest,
     KeywordRemoveMultipleRequest,
     KeywordRemoveCompleteRequest,
-    CompareResponse
+    CompareResponse,
+    DeployRequest
 )
 from app.services.file_service import FileService
 from app.services.comparison_service import ComparisonService
+from app.services.deploy_service import DeployService
 from app.services.auth_service import get_current_user
 from app.routes.auth import get_session_file_path
 
@@ -236,3 +238,37 @@ def compare_local_with_gitlab(username: str = Depends(get_current_user)):
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Comparison failed: {str(e)}"
         )
+
+@router.post("/deploy/gitlab-uat")
+def deploy_to_gitlab_uat(payload: DeployRequest, username: str = Depends(get_current_user)):
+    """
+    Deploys the user's sandbox session file to GitLab UAT repository by cloning,
+    checking out a branch, committing, tagging, and pushing changes.
+    """
+    session_file = verify_session_file(username)
+    try:
+        result = DeployService.deploy_to_gitlab(
+            session_file_path=session_file,
+            token=payload.token,
+            repo_url=payload.repo_url,
+            email=payload.email,
+            name=payload.name,
+            branch=payload.branch,
+            file_path_in_repo=payload.file_path_in_repo,
+            commit_message=payload.commit_message,
+            tag_name=payload.tag_name
+        )
+        if result["status"] == "error":
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=result["message"]
+            )
+        return result
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Deployment operation failed: {str(e)}"
+        )
+

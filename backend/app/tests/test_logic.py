@@ -257,3 +257,37 @@ def test_remove_keyword_multiple_feeds(temp_keywords_file):
             keyword="EU",
             feed_names=["Barclaycard_BPAY", "CLP"]
         )
+
+def test_deploy_to_gitlab_uat(temp_keywords_file):
+    from unittest.mock import patch, MagicMock
+    from app.services.deploy_service import DeployService
+    
+    # Mock subprocess.run
+    with patch("subprocess.run") as mock_run:
+        mock_proc = MagicMock()
+        mock_proc.returncode = 0
+        mock_proc.stdout = "Success"
+        mock_proc.stderr = ""
+        mock_run.return_value = mock_proc
+        
+        result = DeployService.deploy_to_gitlab(
+            session_file_path=temp_keywords_file,
+            token="test_token_1234",
+            repo_url="https://app.gitlab.barcapint.com/barclays/gcwcs/GCWS-FS.git",
+            email="project_16293_bot_b10fdafee1c5883173afcd4306b45be8@noreply.app.gitlab.barcapint.com",
+            name="project_16293_bot",
+            branch="feature/Keyword_Auto_V5",
+            file_path_in_repo="current/refData/Keywords and Lists.txt",
+            commit_message="GCWS-31803",
+            tag_name="delta_build_GCWS-31803V5"
+        )
+        
+        assert result["status"] == "success"
+        assert "Successfully deployed to branch" in result["message"]
+        # Confirm git clone and branch checkout were invoked
+        flat_args = [arg for call in mock_run.call_args_list for arg in call[0][0]]
+        assert "clone" in flat_args
+        assert "checkout" in flat_args
+        assert "tag" in flat_args
+        assert "push" in flat_args
+

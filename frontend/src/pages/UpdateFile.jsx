@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import api from '../services/api';
 import Toast from '../components/Toast';
 import Modal from '../components/Modal';
-import { PlusCircle, Trash2, Loader2, AlertCircle, Info } from 'lucide-react';
+import { PlusCircle, Trash2, Loader2, AlertCircle, Info, Download, GitBranch, CheckCircle, X } from 'lucide-react';
 
 const UpdateFile = ({ setHasChanges }) => {
   // Global Feeds State
@@ -38,6 +38,25 @@ const UpdateFile = ({ setHasChanges }) => {
 
   // Toast Notifications
   const [toast, setToast] = useState(null);
+
+  // Post-operation Modal (Download or GitLab Deploy)
+  const [showPostActionModal, setShowPostActionModal] = useState(false);
+  const [showDeployForm, setShowDeployForm] = useState(false);
+  const [isDeploying, setIsDeploying] = useState(false);
+  const [deploySuccess, setDeploySuccess] = useState(false);
+  const [deployError, setDeployError] = useState('');
+  const [deployLogs, setDeployLogs] = useState([]);
+  
+  const [deployFormData, setDeployFormData] = useState({
+    token: 'glpat-gfsZdoAG7rd7zlp0j649Am86MQp1ojJybGkK.01.101fnisbt',
+    repo_url: 'https://app.gitlab.barcapint.com/barclays/gcwcs/GCWS-FS.git',
+    email: 'project_16293_bot_b10fdafee1c5883173afcd4306b45be8@noreply.app.gitlab.barcapint.com',
+    name: 'project_16293_bot',
+    branch: 'feature/Keyword_Auto_V5',
+    file_path_in_repo: 'current/refData/Keywords and Lists.txt',
+    commit_message: 'GCWS-31803',
+    tag_name: 'delta_build_GCWS-31803V5'
+  });
 
   // Load all data
   const loadData = async () => {
@@ -90,6 +109,53 @@ const UpdateFile = ({ setHasChanges }) => {
 
   const handleCloseToast = () => {
     setToast(null);
+  };
+
+  const handleDownloadSessionFile = async () => {
+    try {
+      const response = await api.get('/session/download', {
+        responseType: 'blob'
+      });
+      const url = window.URL.createObjectURL(new Blob([response.data]));
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', `keywords_updated.txt`);
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(url);
+      showToast('File downloaded successfully.');
+    } catch (err) {
+      console.error("Download failed:", err);
+      showToast('Could not download the session file.', 'error');
+    }
+  };
+
+  const handleDeploySubmit = async (e) => {
+    e.preventDefault();
+    setIsDeploying(true);
+    setDeploySuccess(false);
+    setDeployError('');
+    setDeployLogs([]);
+    
+    try {
+      const response = await api.post('/deploy/gitlab-uat', deployFormData);
+      setDeployLogs(response.data.logs || []);
+      setDeploySuccess(true);
+      showToast('Successfully deployed changes to GitLab UAT!');
+    } catch (err) {
+      console.error("Deployment failed:", err);
+      const errDetail = err.response?.data?.detail || 'Failed to deploy to GitLab UAT.';
+      setDeployError(errDetail);
+      if (err.response?.data?.logs) {
+        setDeployLogs(err.response.data.logs);
+      } else {
+        setDeployLogs(prev => [...prev, `Error: ${errDetail}`]);
+      }
+      showToast('Deployment failed.', 'error');
+    } finally {
+      setIsDeploying(false);
+    }
   };
 
   // Check if keyword is new system-wide
@@ -160,6 +226,7 @@ const UpdateFile = ({ setHasChanges }) => {
       setShowAddModal(false);
       // Reload feeds to update state
       await loadData();
+      setShowPostActionModal(true);
     } catch (err) {
       showToast(err.response?.data?.detail || 'Failed to add keyword.', 'error');
     } finally {
@@ -210,6 +277,7 @@ const UpdateFile = ({ setHasChanges }) => {
       if (setHasChanges) setHasChanges(true);
       // Reload feeds
       await loadData();
+      setShowPostActionModal(true);
     } catch (err) {
       showToast(err.response?.data?.detail || 'Failed to remove keyword.', 'error');
     } finally {
@@ -619,6 +687,257 @@ const UpdateFile = ({ setHasChanges }) => {
           )}
         </div>
       </Modal>
+
+      {/* ================= MODAL: POST-OPERATION ACTION PROMPT ================= */}
+      {showPostActionModal && (
+        <div className="modal-overlay">
+          <div className="modal-card" style={{ maxWidth: '680px' }}>
+            <div className="modal-header">
+              <div className="modal-title-container">
+                <CheckCircle className="modal-icon text-success" size={24} />
+                <h3>Save or Deploy Your Changes</h3>
+              </div>
+              <button 
+                className="modal-close-btn" 
+                onClick={() => {
+                  setShowPostActionModal(false);
+                  setShowDeployForm(false);
+                  setDeployLogs([]);
+                  setDeploySuccess(false);
+                  setDeployError('');
+                }}
+              >
+                <X size={20} />
+              </button>
+            </div>
+            
+            <div className="modal-body" style={{ maxHeight: '75vh', overflowY: 'auto' }}>
+              <p style={{ marginBottom: '20px' }}>
+                Your keywords have been successfully updated in your active session. Choose how you want to save or deploy these updates:
+              </p>
+              
+              <div className="action-buttons-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '20px' }}>
+                <button 
+                  type="button" 
+                  className="btn btn-secondary" 
+                  style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px', padding: '16px', height: 'auto' }}
+                  onClick={handleDownloadSessionFile}
+                >
+                  <Download size={24} className="text-info" />
+                  <strong style={{ fontSize: '1rem', color: 'var(--text-primary)' }}>Download File</strong>
+                  <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', textAlign: 'center' }}>Save a copy of keywords locally to your machine.</span>
+                </button>
+                
+                <button 
+                  type="button" 
+                  className="btn btn-primary" 
+                  style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px', padding: '16px', height: 'auto' }}
+                  onClick={() => {
+                    setShowDeployForm(!showDeployForm);
+                    setDeploySuccess(false);
+                    setDeployError('');
+                  }}
+                >
+                  <GitBranch size={24} className="text-warning" />
+                  <strong style={{ fontSize: '1rem', color: 'var(--text-primary)' }}>Deploy to GitLab UAT</strong>
+                  <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', textAlign: 'center' }}>Directly push changes to the repository in a new branch.</span>
+                </button>
+              </div>
+              
+              {showDeployForm && (
+                <div className="deploy-form-container" style={{ borderTop: '1px solid var(--border-color)', paddingTop: '20px', animation: 'fadeIn 0.2s ease-out' }}>
+                  <h4 style={{ marginBottom: '16px', color: 'var(--text-primary)' }}>GitLab UAT Deployment Details</h4>
+                  
+                  <form onSubmit={handleDeploySubmit}>
+                    <div className="form-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '16px' }}>
+                      <div className="form-group">
+                        <label className="form-label">Repository URL</label>
+                        <input 
+                          type="text" 
+                          className="form-input" 
+                          value={deployFormData.repo_url}
+                          onChange={(e) => setDeployFormData(prev => ({ ...prev, repo_url: e.target.value }))}
+                          required
+                        />
+                      </div>
+                      
+                      <div className="form-group">
+                        <label className="form-label">GitLab Token</label>
+                        <input 
+                          type="password" 
+                          className="form-input" 
+                          value={deployFormData.token}
+                          onChange={(e) => setDeployFormData(prev => ({ ...prev, token: e.target.value }))}
+                          required
+                        />
+                      </div>
+                      
+                      <div className="form-group">
+                        <label className="form-label">Git Config User Email</label>
+                        <input 
+                          type="email" 
+                          className="form-input" 
+                          value={deployFormData.email}
+                          onChange={(e) => setDeployFormData(prev => ({ ...prev, email: e.target.value }))}
+                          required
+                        />
+                      </div>
+                      
+                      <div className="form-group">
+                        <label className="form-label">Git Config User Name</label>
+                        <input 
+                          type="text" 
+                          className="form-input" 
+                          value={deployFormData.name}
+                          onChange={(e) => setDeployFormData(prev => ({ ...prev, name: e.target.value }))}
+                          required
+                        />
+                      </div>
+                      
+                      <div className="form-group">
+                        <label className="form-label">Feature Branch Name</label>
+                        <input 
+                          type="text" 
+                          className="form-input" 
+                          value={deployFormData.branch}
+                          onChange={(e) => setDeployFormData(prev => ({ ...prev, branch: e.target.value }))}
+                          required
+                        />
+                      </div>
+                      
+                      <div className="form-group">
+                        <label className="form-label">Target File Path in Repo</label>
+                        <input 
+                          type="text" 
+                          className="form-input" 
+                          value={deployFormData.file_path_in_repo}
+                          onChange={(e) => setDeployFormData(prev => ({ ...prev, file_path_in_repo: e.target.value }))}
+                          required
+                        />
+                      </div>
+                      
+                      <div className="form-group">
+                        <label className="form-label">Commit Message</label>
+                        <input 
+                          type="text" 
+                          className="form-input" 
+                          value={deployFormData.commit_message}
+                          onChange={(e) => setDeployFormData(prev => ({ ...prev, commit_message: e.target.value }))}
+                          required
+                        />
+                      </div>
+                      
+                      <div className="form-group">
+                        <label className="form-label">Tag Name</label>
+                        <input 
+                          type="text" 
+                          className="form-input" 
+                          value={deployFormData.tag_name}
+                          onChange={(e) => setDeployFormData(prev => ({ ...prev, tag_name: e.target.value }))}
+                          required
+                        />
+                      </div>
+                    </div>
+                    
+                    {deployError && (
+                      <div className="error-alert" style={{ marginBottom: '16px', padding: '12px', background: 'rgba(239, 68, 68, 0.1)', border: '1px solid var(--text-danger)', borderRadius: '6px', color: 'var(--text-danger)' }}>
+                        <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                          <AlertCircle size={16} />
+                          <span>{deployError}</span>
+                        </div>
+                      </div>
+                    )}
+                    
+                    {deploySuccess && (
+                      <div className="success-alert" style={{ marginBottom: '16px', padding: '12px', background: 'rgba(16, 185, 129, 0.1)', border: '1px solid var(--text-success)', borderRadius: '6px', color: 'var(--text-success)' }}>
+                        <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                          <CheckCircle size={16} />
+                          <span>Deployment completed successfully! Pushed branch and tag to GitLab UAT.</span>
+                        </div>
+                      </div>
+                    )}
+                    
+                    {deployLogs.length > 0 && (
+                      <div className="logs-console" style={{ marginBottom: '16px' }}>
+                        <label className="form-label">Deployment Logs</label>
+                        <div style={{ 
+                          background: '#0a0d14', 
+                          border: '1px solid var(--border-color)', 
+                          borderRadius: '6px', 
+                          padding: '12px', 
+                          fontFamily: 'monospace', 
+                          fontSize: '0.8rem', 
+                          color: '#34d399', 
+                          maxHeight: '180px', 
+                          overflowY: 'auto',
+                          whiteSpace: 'pre-wrap'
+                        }}>
+                          {deployLogs.map((log, idx) => (
+                            <div key={idx} style={{ 
+                              color: log.startsWith("stderr:") ? '#f87171' : 
+                                     log.startsWith("Running command:") ? '#60a5fa' : 
+                                     log.startsWith("Error:") ? '#ef4444' : '#34d399',
+                              marginBottom: '4px',
+                              textAlign: 'left'
+                            }}>
+                              {log}
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                    
+                    <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px' }}>
+                      <button 
+                        type="button" 
+                        className="btn btn-secondary"
+                        onClick={() => setShowDeployForm(false)}
+                        disabled={isDeploying}
+                      >
+                        Cancel
+                      </button>
+                      <button 
+                        type="submit" 
+                        className="btn btn-primary"
+                        disabled={isDeploying}
+                        style={{ display: 'flex', alignItems: 'center', gap: '8px' }}
+                      >
+                        {isDeploying ? (
+                          <>
+                            <Loader2 className="spinner" size={16} />
+                            <span>Deploying...</span>
+                          </>
+                        ) : (
+                          <>
+                            <GitBranch size={16} />
+                            <span>Submit Deployment</span>
+                          </>
+                        )}
+                      </button>
+                    </div>
+                  </form>
+                </div>
+              )}
+            </div>
+            
+            <div className="modal-footer" style={{ justifyContent: 'flex-end' }}>
+              <button 
+                className="btn btn-secondary" 
+                onClick={() => {
+                  setShowPostActionModal(false);
+                  setShowDeployForm(false);
+                  setDeployLogs([]);
+                  setDeploySuccess(false);
+                  setDeployError('');
+                }}
+                disabled={isDeploying}
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

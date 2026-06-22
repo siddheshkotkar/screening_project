@@ -108,3 +108,21 @@ class CompareResponse(BaseModel):
     summary: CompareSummary
     details: List[FeedDiff]
     special_lists: List[FeedDiff]
+
+class DeployRequest(BaseModel):
+    token: str
+    repo_url: str
+    email: str
+    name: str
+    branch: str
+    file_path_in_repo: str
+    commit_message: str
+    tag_name: str
+
+    @field_validator("token", "repo_url", "email", "name", "branch", "file_path_in_repo", "commit_message", "tag_name")
+    def validate_non_empty(cls, v):
+        val = v.strip()
+        if not val:
+            raise ValueError("All deployment configuration fields must be provided")
+        return val
+
