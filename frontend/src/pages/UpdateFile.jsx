@@ -52,11 +52,26 @@ const UpdateFile = ({ setHasChanges }) => {
     repo_url: 'https://app.gitlab.barcapint.com/barclays/gcwcs/GCWS-FS.git',
     email: 'project_16293_bot_b10fdafee1c5883173afcd4306b45be8@noreply.app.gitlab.barcapint.com',
     name: 'project_16293_bot',
-    branch: 'feature/Keyword_Auto_V5',
     file_path_in_repo: 'current/refData/Keywords and Lists.txt',
+    jiraNumber: 'GCWS-31803',
+    version: 'V5',
+    branch: 'feature/Keyword_Auto_V5',
     commit_message: 'GCWS-31803',
     tag_name: 'delta_build_GCWS-31803V5'
   });
+
+  const handleJiraOrVersionChange = (field, value) => {
+    setDeployFormData(prev => {
+      const updated = { ...prev, [field]: value };
+      const jira = updated.jiraNumber.trim();
+      const ver = updated.version.trim();
+      
+      updated.branch = `feature/Keyword_Auto_${ver}`;
+      updated.commit_message = jira;
+      updated.tag_name = `delta_build_${jira}${ver}`;
+      return updated;
+    });
+  };
 
   // Load all data
   const loadData = async () => {
@@ -751,6 +766,32 @@ const UpdateFile = ({ setHasChanges }) => {
                   <form onSubmit={handleDeploySubmit}>
                     <div className="form-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '16px' }}>
                       <div className="form-group">
+                        <label className="form-label" style={{ color: 'var(--text-primary)', fontWeight: 'bold' }}>JIRA Number</label>
+                        <input 
+                          type="text" 
+                          className="form-input" 
+                          style={{ borderColor: 'var(--text-warning)' }}
+                          placeholder="e.g. GCWS-31803"
+                          value={deployFormData.jiraNumber}
+                          onChange={(e) => handleJiraOrVersionChange('jiraNumber', e.target.value)}
+                          required
+                        />
+                      </div>
+
+                      <div className="form-group">
+                        <label className="form-label" style={{ color: 'var(--text-primary)', fontWeight: 'bold' }}>Version</label>
+                        <input 
+                          type="text" 
+                          className="form-input" 
+                          style={{ borderColor: 'var(--text-warning)' }}
+                          placeholder="e.g. V5"
+                          value={deployFormData.version}
+                          onChange={(e) => handleJiraOrVersionChange('version', e.target.value)}
+                          required
+                        />
+                      </div>
+
+                      <div className="form-group">
                         <label className="form-label">Repository URL</label>
                         <input 
                           type="text" 
@@ -795,7 +836,7 @@ const UpdateFile = ({ setHasChanges }) => {
                       </div>
                       
                       <div className="form-group">
-                        <label className="form-label">Feature Branch Name</label>
+                        <label className="form-label">Feature Branch Name (Auto-derived)</label>
                         <input 
                           type="text" 
                           className="form-input" 
@@ -817,7 +858,7 @@ const UpdateFile = ({ setHasChanges }) => {
                       </div>
                       
                       <div className="form-group">
-                        <label className="form-label">Commit Message</label>
+                        <label className="form-label">Commit Message (Auto-derived)</label>
                         <input 
                           type="text" 
                           className="form-input" 
@@ -828,7 +869,7 @@ const UpdateFile = ({ setHasChanges }) => {
                       </div>
                       
                       <div className="form-group">
-                        <label className="form-label">Tag Name</label>
+                        <label className="form-label">Tag Name (Auto-derived)</label>
                         <input 
                           type="text" 
                           className="form-input" 
