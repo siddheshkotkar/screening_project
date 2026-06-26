@@ -249,12 +249,8 @@ def deploy_to_gitlab_uat(payload: DeployRequest, username: str = Depends(get_cur
     try:
         result = DeployService.deploy_to_gitlab(
             session_file_path=session_file,
-            token=payload.token,
-            repo_url=payload.repo_url,
-            email=payload.email,
-            name=payload.name,
+            jira_num=payload.jira_num,
             branch=payload.branch,
-            file_path_in_repo=payload.file_path_in_repo,
             commit_message=payload.commit_message,
             tag_name=payload.tag_name
         )

@@ -262,8 +262,17 @@ def test_deploy_to_gitlab_uat(temp_keywords_file):
     from unittest.mock import patch, MagicMock
     from app.services.deploy_service import DeployService
     
-    # Mock subprocess.run
-    with patch("subprocess.run") as mock_run:
+    # Mock subprocess.run and httpx.get
+    with patch("subprocess.run") as mock_run, patch("httpx.get") as mock_http:
+        # Mock httpx response for user details
+        mock_resp = MagicMock()
+        mock_resp.status_code = 200
+        mock_resp.json.return_value = {
+            "email": "project_16293_bot_709f42e645c9665686ada9227cf4a670@noreply.app.gitlab.barcapint.com",
+            "username": "project_16293_bot"
+        }
+        mock_http.return_value = mock_resp
+
         mock_proc = MagicMock()
         mock_proc.returncode = 0
         mock_proc.stdout = "Success"
@@ -272,12 +281,8 @@ def test_deploy_to_gitlab_uat(temp_keywords_file):
         
         result = DeployService.deploy_to_gitlab(
             session_file_path=temp_keywords_file,
-            token="test_token_1234",
-            repo_url="https://app.gitlab.barcapint.com/barclays/gcwcs/GCWS-FS.git",
-            email="project_16293_bot_b10fdafee1c5883173afcd4306b45be8@noreply.app.gitlab.barcapint.com",
-            name="project_16293_bot",
+            jira_num="GCWS-31803",
             branch="feature/Keyword_Auto_V5",
-            file_path_in_repo="current/refData/Keywords and Lists.txt",
             commit_message="GCWS-31803",
             tag_name="delta_build_GCWS-31803V5"
         )

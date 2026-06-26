@@ -110,16 +110,12 @@ class CompareResponse(BaseModel):
     special_lists: List[FeedDiff]
 
 class DeployRequest(BaseModel):
-    token: str
-    repo_url: str
-    email: str
-    name: str
+    jira_num: str
     branch: str
-    file_path_in_repo: str
     commit_message: str
     tag_name: str
 
-    @field_validator("token", "repo_url", "email", "name", "branch", "file_path_in_repo", "commit_message", "tag_name")
+    @field_validator("jira_num", "branch", "commit_message", "tag_name")
     def validate_non_empty(cls, v):
         val = v.strip()
         if not val:

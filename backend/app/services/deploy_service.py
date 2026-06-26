@@ -3,7 +3,10 @@ import shutil
 import subprocess
 import uuid
 import logging
+from urllib.parse import urlparse
 from typing import Dict, Any
+import httpx
+from app.config import settings
 
 logger = logging.getLogger(__name__)
 
@@ -11,19 +14,21 @@ class DeployService:
     @staticmethod
     def deploy_to_gitlab(
         session_file_path: str,
-        token: str,
-        repo_url: str,
-        email: str,
-        name: str,
+        jira_num: str,
         branch: str,
-        file_path_in_repo: str,
         commit_message: str,
         tag_name: str
     ) -> Dict[str, Any]:
         """
         Clones remote repository, checks out/creates a branch, updates the target keywords file,
         commits, tags, and pushes branch and tag to the remote repository.
+        Git credentials (token, repo_url) are read from settings, and git user identity is
+        fetched dynamically from the GitLab API.
         """
+        token = settings.gitlab_token
+        repo_url = settings.gitlab_repo_url
+        file_path_in_repo = "current/refData/Keywords and Lists.txt"
+
         # Create temp directory inside the backend/data directory
         base_temp_dir = os.path.join(
             os.path.dirname(os.path.dirname(os.path.dirname(__file__))), 
@@ -43,11 +48,53 @@ class DeployService:
             auth_url = repo_url.replace("http://", f"http://oauth2:{token}@")
             
         logs = []
-        
+
+        # 1. Fetch bot user details dynamically from GitLab API (matching UAT script)
+        logs.append("Fetching bot user details for current token...")
+        try:
+            parsed_url = urlparse(repo_url)
+            api_base = f"{parsed_url.scheme}://{parsed_url.netloc}"
+        except Exception:
+            api_base = "https://app.gitlab.barcapint.com"
+        api_url = f"{api_base}/api/v4/user"
+
+        email = None
+        username = None
+
+        try:
+            # We ignore SSL verification for self-signed certificates in UAT environment
+            response = httpx.get(
+                api_url, 
+                headers={"PRIVATE-TOKEN": token}, 
+                verify=False, 
+                timeout=5.0
+            )
+            if response.status_code == 200:
+                data = response.json()
+                email = data.get("email")
+                username = data.get("username")
+            else:
+                logs.append(f"GitLab API returned status code {response.status_code}: {response.text}")
+        except Exception as e:
+            logs.append(f"Failed to fetch bot user details from GitLab: {str(e)}")
+
+        if not email or not username:
+            err_msg = "Error: Could not fetch bot email"
+            logs.append(err_msg)
+            return {
+                "status": "error",
+                "message": err_msg,
+                "logs": logs
+            }
+
+        logs.append("Configuring git with bot identity:")
+        logs.append(f"  Email: {email}")
+        logs.append(f"  Username: {username}")
+
         def run_git(args, cwd=None):
             cmd_str = " ".join(args)
             # Mask token in logs for security
-            safe_cmd_str = cmd_str.replace(token, "********")
+            safe_cmd_str = cmd_str.replace(token, "********") if token else cmd_str
             logs.append(f"Running command: {safe_cmd_str}")
             
             result = subprocess.run(
@@ -71,21 +118,25 @@ class DeployService:
             return result.stdout
             
         try:
-            # 1. Clone repository (disabling SSL check on clone)
+            # 2. Clone repository (disabling SSL check on clone)
             run_git(["git", "-c", "http.sslVerify=false", "clone", auth_url, clone_dir])
             
             # Disable SSL verify for subsequent commands in this clone
             run_git(["git", "config", "http.sslVerify", "false"], cwd=clone_dir)
             
-            # 2. Configure Git user
+            # 3. Configure Git user
             run_git(["git", "config", "user.email", email], cwd=clone_dir)
-            run_git(["git", "config", "user.name", name], cwd=clone_dir)
+            run_git(["git", "config", "user.name", username], cwd=clone_dir)
             
-            # 3. Create and switch to the target branch
-            # checkout -B resets the branch if it already exists
-            run_git(["git", "checkout", "-B", branch], cwd=clone_dir)
+            # 4. Create and switch to the target branch
+            try:
+                run_git(["git", "checkout", "-b", branch], cwd=clone_dir)
+                logs.append(f"{branch} is created")
+            except Exception:
+                # If branch creation fails (e.g. branch already exists), checkout -f directly
+                run_git(["git", "checkout", "-f", branch], cwd=clone_dir)
             
-            # 4. Overwrite target file
+            # 5. Overwrite target file
             target_file_path = os.path.join(clone_dir, file_path_in_repo)
             os.makedirs(os.path.dirname(target_file_path), exist_ok=True)
             
@@ -97,20 +148,20 @@ class DeployService:
                 
             logs.append(f"Successfully wrote updates to: {file_path_in_repo}")
             
-            # 5. Add changes
+            # 6. Add changes
             run_git(["git", "add", file_path_in_repo], cwd=clone_dir)
             
-            # 6. Commit if changes are present
+            # 7. Commit changes (Commit message is GCWS-31803 or user-inputted commit_message)
             status_out = run_git(["git", "status", "--porcelain"], cwd=clone_dir)
             if status_out.strip():
                 run_git(["git", "commit", "-m", commit_message], cwd=clone_dir)
             else:
                 logs.append("No changes detected in file. Skipping commit.")
                 
-            # 7. Push branch
+            # 8. Push branch
             run_git(["git", "push", "origin", branch], cwd=clone_dir)
             
-            # 8. Create and push tag
+            # 9. Create and push tag
             run_git(["git", "tag", "-f", tag_name], cwd=clone_dir)
             run_git(["git", "push", "origin", tag_name, "--force"], cwd=clone_dir)
             
@@ -122,7 +173,7 @@ class DeployService:
             
         except Exception as e:
             logger.error(f"Deployment failed: {str(e)}")
-            error_msg = str(e).replace(token, "********")
+            error_msg = str(e).replace(token, "********") if token else str(e)
             return {
                 "status": "error",
                 "message": f"Deployment failed: {error_msg}",

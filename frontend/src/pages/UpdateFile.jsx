@@ -48,27 +48,11 @@ const UpdateFile = ({ setHasChanges }) => {
   const [deployLogs, setDeployLogs] = useState([]);
   
   const [deployFormData, setDeployFormData] = useState({
-    token: 'glpat-gfsZdoAG7rd7zlp0j649Am86MQp1ojJybGkK.01.101fnisbt',
-    repo_url: 'https://app.gitlab.barcapint.com/barclays/gcwcs/GCWS-FS.git',
-    email: 'project_16293_bot_b10fdafee1c5883173afcd4306b45be8@noreply.app.gitlab.barcapint.com',
-    name: 'project_16293_bot',
-    file_path_in_repo: 'current/refData/Keywords and Lists.txt',
-    jiraNumber: 'GCWS-31803',
-    branch: 'feature/Keyword_Auto_V5',
-    commit_message: 'GCWS-31803',
-    tag_name: 'delta_build_GCWS-31803V5'
+    jira_num: '',
+    branch: '',
+    commit_message: '',
+    tag_name: ''
   });
-
-  const handleJiraNumberChange = (value) => {
-    setDeployFormData(prev => {
-      const updated = { ...prev, jiraNumber: value };
-      const jira = value.strip ? value.strip() : value.trim();
-      
-      updated.commit_message = jira;
-      updated.tag_name = `delta_build_${jira}V5`;
-      return updated;
-    });
-  };
 
   // Load all data
   const loadData = async () => {
@@ -768,9 +752,8 @@ const UpdateFile = ({ setHasChanges }) => {
                           type="text" 
                           className="form-input" 
                           style={{ borderColor: 'var(--text-warning)' }}
-                          placeholder="e.g. GCWS-31803"
-                          value={deployFormData.jiraNumber}
-                          onChange={(e) => handleJiraNumberChange(e.target.value)}
+                          value={deployFormData.jira_num}
+                          onChange={(e) => setDeployFormData(prev => ({ ...prev, jira_num: e.target.value }))}
                           required
                         />
                       </div>
