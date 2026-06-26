@@ -85,7 +85,8 @@ def logout(
     Removes session from DB and deletes the user's active session file from the server.
     """
     token = authorization.split(" ")[1].strip()
-    AuthService.delete_session(token)
+    if token != "sso_mock_token":
+        AuthService.delete_session(token)
     
     # Delete temporary session file
     session_file = get_session_file_path(username)

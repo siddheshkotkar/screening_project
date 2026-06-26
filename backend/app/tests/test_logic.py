@@ -296,3 +296,10 @@ def test_deploy_to_gitlab_uat(temp_keywords_file):
         assert "tag" in flat_args
         assert "push" in flat_args
 
+def test_sso_login_bypass():
+    from app.services.auth_service import get_current_user
+    # Test that the dependency accepts Bearer sso_mock_token and returns sso_user
+    username = get_current_user(authorization="Bearer sso_mock_token")
+    assert username == "sso_user"
+
+

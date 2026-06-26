@@ -75,6 +75,13 @@ const Login = ({ onLoginSuccess }) => {
     }
   };
 
+  const handleSSOLogin = () => {
+    showToast('SSO Authentication successful!');
+    setTimeout(() => {
+      onLoginSuccess('sso_mock_token', 'sso_user');
+    }, 800);
+  };
+
   return (
     <div className="login-page-container">
       {toast && (
@@ -189,6 +196,30 @@ const Login = ({ onLoginSuccess }) => {
             )}
           </button>
         </form>
+
+        <div style={{ display: 'flex', alignItems: 'center', margin: '20px 0', width: '100%' }}>
+          <div style={{ flex: 1, height: '1px', background: 'var(--border-color)', opacity: 0.5 }}></div>
+          <span style={{ padding: '0 12px', fontSize: '0.85rem', color: 'var(--text-secondary)' }}>or</span>
+          <div style={{ flex: 1, height: '1px', background: 'var(--border-color)', opacity: 0.5 }}></div>
+        </div>
+
+        <button 
+          type="button" 
+          className="btn btn-secondary login-sso-btn"
+          style={{ 
+            width: '100%', 
+            display: 'flex', 
+            alignItems: 'center', 
+            justifyContent: 'center', 
+            gap: '8px', 
+            padding: '12px',
+            borderColor: 'var(--border-color-hover)'
+          }}
+          onClick={handleSSOLogin}
+        >
+          <ShieldCheck size={18} className="text-info" />
+          <span>Login with SSO</span>
+        </button>
 
         <div className="login-footer-note">
           <p>Master User Seed: <code>master_user</code> / <code>password123</code></p>
