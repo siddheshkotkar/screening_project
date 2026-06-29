@@ -268,7 +268,7 @@ def test_deploy_to_gitlab_uat(temp_keywords_file):
         mock_resp = MagicMock()
         mock_resp.status_code = 200
         mock_resp.json.return_value = {
-            "email": "project_16293_bot_709f42e645c9665686ada9227cf4a670@noreply.app.gitlab.barcapint.com",
+            "email": "project_16293_bot_709f42e645c9665686ada9227cf4a670@noreply.gitlab.example.com",
             "username": "project_16293_bot"
         }
         mock_http.return_value = mock_resp

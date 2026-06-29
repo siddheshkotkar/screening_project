@@ -55,7 +55,7 @@ class DeployService:
             parsed_url = urlparse(repo_url)
             api_base = f"{parsed_url.scheme}://{parsed_url.netloc}"
         except Exception:
-            api_base = "https://app.gitlab.barcapint.com"
+            api_base = "https://gitlab.example.com"
         api_url = f"{api_base}/api/v4/user"
 
         email = None
